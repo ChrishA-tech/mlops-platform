@@ -1,0 +1,8 @@
+{
+  "cv_pr_auc": 0.6379,
+  "val_pr_auc": 0.6408,
+  "val_roc_auc": 0.8374,
+  "test_pr_auc": 0.635,
+  "test_roc_auc": 0.8341,
+  "test_brier": 0.156
+}

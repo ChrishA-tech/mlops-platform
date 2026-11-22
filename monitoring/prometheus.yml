@@ -1,0 +1,19 @@
+# Prometheus scrape config for the serving service.
+global:
+  scrape_interval: 15s
+scrape_configs:
+  - job_name: mlops-serving
+    kubernetes_sd_configs:
+      - role: pod
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: "true"
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        target_label: __address__
+        regex: (.+)
+    # Falls back to static target for local docker-compose runs:
+  - job_name: mlops-serving-local
+    static_configs:
+      - targets: ["serving:8000"]

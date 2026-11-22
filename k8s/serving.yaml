@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: mlops-serving-config, labels: {app: mlops-serving}}
+data:
+  DECISION_THRESHOLD: "0.5"
+  LOG_LEVEL: "INFO"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: mlops-serving, labels: {app: mlops-serving}}
+spec:
+  replicas: 2
+  strategy: {type: RollingUpdate, rollingUpdate: {maxUnavailable: 0, maxSurge: 1}}
+  selector: {matchLabels: {app: mlops-serving}}
+  template:
+    metadata:
+      labels: {app: mlops-serving}
+      annotations: {prometheus.io/scrape: "true", prometheus.io/port: "8000", prometheus.io/path: /metrics}
+    spec:
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: serving
+          image: mlops-platform:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports: [{containerPort: 8000, name: http}]
+          envFrom: [{configMapRef: {name: mlops-serving-config}}]
+          resources:
+            requests: {cpu: 250m, memory: 256Mi}
+            limits: {cpu: "1", memory: 512Mi}
+          readinessProbe: {httpGet: {path: /readyz, port: http}, initialDelaySeconds: 3, periodSeconds: 5}
+          livenessProbe: {httpGet: {path: /healthz, port: http}, initialDelaySeconds: 10, periodSeconds: 10}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: ["ALL"]}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: mlops-serving, labels: {app: mlops-serving}}
+spec:
+  selector: {app: mlops-serving}
+  ports: [{name: http, port: 80, targetPort: http}]
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: mlops-serving, labels: {app: mlops-serving}}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: mlops-serving}
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource: {name: cpu, target: {type: Utilization, averageUtilization: 70}}

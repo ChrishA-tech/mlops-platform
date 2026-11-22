@@ -1,0 +1,28 @@
+# Swappable dataset + pipeline configuration.
+# To scale up, point `source` at a local NYC taxi parquet (millions of rows) and
+# set id_col/target accordingly — the pipeline is dataset-agnostic.
+dataset:
+  name: telco_churn
+  source: data/telco_churn.csv
+  id_col: customerID
+  target: Churn
+  positive_label: "Yes"
+
+split:
+  test_size: 0.2
+  valid_size: 0.2
+  random_state: 42
+
+hpo:
+  n_trials: 15
+  cv_folds: 4
+  metric: average_precision   # PR-AUC; robust to class imbalance
+  timeout_s: 600
+
+model:
+  registry_name: churn-lgbm
+  decision_threshold: 0.5
+
+mlflow:
+  tracking_uri: sqlite:///mlflow.db
+  experiment: mlops-platform

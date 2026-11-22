@@ -1,0 +1,37 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      HPO_N_TRIALS: "4"
+      MLFLOW_DISABLE_AGENT_HINT: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -e ".[dev]"
+      - name: Train (HPO + MLflow tracking + registry)
+        run: python -m mlops.train
+      - name: Tests (validation, features, drift, serving)
+        run: pytest -q
+      - name: Build serving image
+        run: docker build -t mlops-platform:1.0.0 .
+  manifests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install pyyaml kubernetes-validate
+      - name: Validate Kubernetes manifests
+        run: |
+          python - <<'PY'
+          import glob, yaml, kubernetes_validate
+          n = 0
+          for f in glob.glob("k8s/*.yaml"):
+              for d in yaml.safe_load_all(open(f)):
+                  if d: kubernetes_validate.validate(d, "1.29", strict=True); n += 1
+          print("validated", n, "manifests")
+          assert n >= 1
+          PY
